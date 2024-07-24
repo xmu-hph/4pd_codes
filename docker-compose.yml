@@ -1,0 +1,83 @@
+version: '3.7'
+services:
+  tts:
+    image: harbor.4pd.io/lab-platform/pk_platform/model_services/hph_for_4pd_tts:jupyter_nvcc_torch230_cuda121_cudnn8_ubuntu2204_xtts_model_image_base_vscode
+    container_name: tts_hupenghui
+    privileged: true
+    network_mode: host
+    pid: host
+    ipc: host
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    volumes:
+      - /home/hupenghui/data1/hupenghui:/home/mnt
+    devices:
+      - /dev/fuse:/dev/fuse
+    cap_add:
+      - SYS_ADMIN
+      - MKNOD
+    security_opt:
+      - apparmor:unconfined
+    stdin_open: true
+    tty: true
+    labels:
+      com.example.category: tts_hupenghui
+      com.example.maintainer: hupenghui
+  traffic:
+    image: harbor.4pd.io/lab-platform/pk_platform/model_services/hph_for_automl:traffic_nvcc_torch210_cuda118_cudnn8_ubuntu2204_vscode_base_image
+    container_name: traffic_hupenghui
+    privileged: true
+    network_mode: host
+    pid: host
+    ipc: host
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    volumes:
+      - /home/hupenghui/data1/hupenghui:/home/mnt
+    devices:
+      - /dev/fuse:/dev/fuse
+    cap_add:
+      - SYS_ADMIN
+      - MKNOD
+    security_opt:
+      - apparmor:unconfined
+    stdin_open: true
+    tty: true
+    labels:
+      com.example.category: traffic_hupenghui
+      com.example.maintainer: hupenghui
+  base:
+    image: harbor.4pd.io/lab-platform/pk_platform/model_services/hph_base:jupyter_nvcc_torch_ubuntu2204_base_image_vscode
+    container_name: base_hupenghui
+    privileged: true
+    network_mode: host
+    pid: host
+    ipc: host
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    volumes:
+      - /home/hupenghui/data1/hupenghui:/home/mnt
+    devices:
+      - /dev/fuse:/dev/fuse
+    cap_add:
+      - SYS_ADMIN
+      - MKNOD
+    security_opt:
+      - apparmor:unconfined
+    stdin_open: true
+    tty: true
+    labels:
+      com.example.category: base_hupenghui
+      com.example.maintainer: hupenghui

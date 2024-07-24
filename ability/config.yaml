@@ -1,0 +1,50 @@
+#docker run --rm -it --gpus '"device=1"' --network host harbor.4pd.io/lab-platform/pk_platform/model_services/basemodel_ability_hupenghui:german /bin/bash
+docker_image: harbor.4pd.io/lab-platform/pk_platform/model_services/basemodel_ability_hupenghui:english
+api_path: /api/v1/chat/completions
+api_header: 
+  Content-Type: application/json
+api_config:
+  temperature: 0.5
+choice_prompt_template: "<|CHOICE|>{question}"
+values:
+  env:
+    - name: lang
+      value: italian
+    - name: workers
+      value: 30
+  resources:
+    limits:
+      cpu: 2
+      memory: 16Gi
+      nvidia.com/gpu: 1
+    requests:
+      cpu: 2
+      memory: 16Gi
+      nvidia.com/gpu: 1
+  nodeSelector:
+    contest.4pd.io/accelerator: A100-SXM4-80GB
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: 80 #服务的端口
+    initialDelaySeconds: 10 # pod被拉起后多久开始readiness检测
+    periodSeconds: 10 # 两次readiness检测之间的间隔
+    timeoutSeconds: 1 # 单次readiness检测超时时间
+leaderboard_options:
+  nfs:
+    - name: model_zoo
+      srcRelativePath: hupenghui/model
+      mountPoint: /root/model
+      source: ucloud_juicefs
+#  volumeMounts:
+#    - name: customer
+#      mountPath: /tmp/customer
+# leaderboard_options:
+#   modelhub_deploy_timeout: 600 # 部署超时时间 单位秒
+#   modelhub:
+#     llm: # 自定义名称，可以声明多个
+#       modelBranch: main # v1 # main
+#       modelRepo: public/qwen2-72b-instruct-awq # public/meta-llama-3-8b-instruct # public/qwen1-5-72b-chat # public/meta-llama-3-70b-instruct-gptq # public/qwen2-72b-instruct-awq@main # public/qwen1-5-14b-chat@main
+#       gpuModel: A100-SXM4-80GB # 目前只支持A100-SXM4-80GB
+#       gpuNum: 1 # 目前只有1和2
+
