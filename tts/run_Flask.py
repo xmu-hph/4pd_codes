@@ -61,10 +61,25 @@ def check_ready():
     if not flag:
         return Response(response=jsonify({"status_code": 400}).get_data(), status=400, mimetype='application/json')
     return Response(response=jsonify({"status_code": 200}).get_data(), status=200, mimetype='application/json')
+import base64
+import numpy as np
+import torchaudio
+@app.route('/internal/v1/voice-clone', methods=['POST'])
+def internal_voice_clone():
+    resp = request.get_json()
+    voice_name = resp['voice_name']
+    audio_bytes = resp['audios']['audio_bytes']#bytes
+    audio_format = resp['audios']['audio_format']#
+    try:
+        audio_data = np.frombuffer(base64.b64decode(audio_bytes), dtype=np.float32)
+        torchaudio.save('./clones/'+voice_name+'.wav', audio_data.unsqueeze(0), args.sample_rate)
+        return Response(response=jsonify({"voice_name": voice_name,'status':2}).get_data(), status=200, mimetype='application/json')
+    except:
+        return Response(response=jsonify({"voice_name": voice_name,'status':3}).get_data(), status=200, mimetype='application/json')
 import re
 import concurrent.futures
 executor = concurrent.futures.ThreadPoolExecutor(max_workers=args.max_workers)
-@app.route('/', methods=['POST'])
+@app.route('/v1/tts', methods=['POST'])
 def synthesize_speech():
     global model,executor,config,args
     resp = request.get_json()
@@ -114,5 +129,6 @@ def long_time_run(model,config,transcription,speaker_wav,language,args):
     result = torch.cat(chunks)
     torchaudio.save(file_name, result.unsqueeze(0), args.sample_rate)
     return file_name
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=80, debug=False)

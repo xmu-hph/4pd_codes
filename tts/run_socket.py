@@ -38,7 +38,7 @@ import random
 from aiohttp import web
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument('--max_workers',type=int,default=2)
+parser.add_argument('--max_workers',type=int,default=1)
 parser.add_argument('--split_length',type=int,default=80)
 parser.add_argument('--ping_delay',type=int,default=1000)
 parser.add_argument('--device',type=str,default='cuda')
@@ -84,6 +84,7 @@ single_length = args.split_length
 ping_delay = args.ping_delay
 import re
 import numpy as np
+import librosa
 async def tts_server(websocket, path):
     global single_length,lang_map,model,config
     if path == "/stream/tts":
@@ -107,10 +108,9 @@ async def tts_server(websocket, path):
                 data = json.loads(message)
                 logging.info(f"data: {data.keys()}")
                 if 'text' in data:
-                    i=0
+                    i = 0
                     text = data["text"]
                     logging.info(f"received text: {len(text),text[0:15]}")
-                    '''
                     b_start = bytes(10)
                     base64_audio_data = base64.b64encode(b_start).decode('utf-8')
                     strat_re = {
@@ -120,7 +120,7 @@ async def tts_server(websocket, path):
                     }
                     await websocket.send(json.dumps(strat_re))
                     logging.info(f"sent {i} part")
-                    '''
+                    i += 1
                     if voice_name=='default':
                         voice_name = voice_name
                     else:
@@ -144,14 +144,16 @@ async def tts_server(websocket, path):
                     for index in range(len(text)):
                         chunks = model.inference_stream(text[index],lang_map[language],gpt_cond_latent,speaker_embedding,temperature=args.temperature)
                         for _, chunk in enumerate(chunks):
+                            #resampled_audio = librosa.resample(data, orig_sr=24000, target_sr=44000)
+                            resampled_audio = librosa.resample(chunk.cpu().numpy(), orig_sr=24000, target_sr=sample_rate)
                             response = {
-                                    "data": base64.b64encode(chunk.cpu().numpy()[::(24000//sample_rate)].tobytes()).decode('utf-8'),
+                                    "data": base64.b64encode(resampled_audio.tobytes()).decode('utf-8'),
                                     "audio_status": 1,
                                     "audio_block_seq": i
                                     }
                             await websocket.send(json.dumps(response))
                             logging.info(f"sent {i} part")
-                            i +=1
+                            i += 1
                         torch.cuda.empty_cache()
                     #i +=1
                     b = bytes(10)
@@ -163,6 +165,7 @@ async def tts_server(websocket, path):
                     }
                     await websocket.send(json.dumps(response))
                     logging.info(f"sent {i} part")
+                    i += 1
                 else:
                     logging.warn(f"Unexpected message format: {data}")
         finally:

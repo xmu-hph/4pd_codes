@@ -14,12 +14,13 @@ services:
           devices:
             - capabilities: [gpu]
     volumes:
-      - /home/hupenghui/data1/hupenghui:/home/mnt
+      - /home/hupenghui/code:/home/mnt
     devices:
       - /dev/fuse:/dev/fuse
     cap_add:
       - SYS_ADMIN
       - MKNOD
+      - NET_ADMIN
     security_opt:
       - apparmor:unconfined
     stdin_open: true
@@ -41,12 +42,13 @@ services:
           devices:
             - capabilities: [gpu]
     volumes:
-      - /home/hupenghui/data1/hupenghui:/home/mnt
+      - /home/hupenghui/code:/home/mnt
     devices:
       - /dev/fuse:/dev/fuse
     cap_add:
       - SYS_ADMIN
       - MKNOD
+      - NET_ADMIN
     security_opt:
       - apparmor:unconfined
     stdin_open: true
@@ -54,9 +56,9 @@ services:
     labels:
       com.example.category: traffic_hupenghui
       com.example.maintainer: hupenghui
-  base:
+  download:
     image: harbor.4pd.io/lab-platform/pk_platform/model_services/hph_base:jupyter_nvcc_torch_ubuntu2204_base_image_vscode
-    container_name: base_hupenghui
+    container_name: download_hupenghui
     privileged: true
     network_mode: host
     pid: host
@@ -68,16 +70,17 @@ services:
           devices:
             - capabilities: [gpu]
     volumes:
-      - /home/hupenghui/data1/hupenghui:/home/mnt
+      - /mnt/data:/home/mnt
     devices:
       - /dev/fuse:/dev/fuse
     cap_add:
       - SYS_ADMIN
       - MKNOD
+      - NET_ADMIN
     security_opt:
       - apparmor:unconfined
     stdin_open: true
     tty: true
     labels:
-      com.example.category: base_hupenghui
+      com.example.category: download_hupenghui
       com.example.maintainer: hupenghui

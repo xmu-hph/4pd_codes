@@ -1,0 +1,22 @@
+docker_image: harbor-contest.4pd.io/hupenghui/tts:tts_clone
+values:
+  command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "80"]
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: 80
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    timeoutSeconds: 1
+    failureThreshold: 10000
+  resources:
+    limits:
+      cpu: 1
+      memory: 16G
+      nvidia.com/gpu: 1
+    requests:
+      cpu: 1
+      memory: 16G
+      nvidia.com/gpu: 1
+#nodeSelector:
+#  contest.4pd.io/accelerator: A100-SXM4-80GB
