@@ -3,9 +3,13 @@ import torch.nn as nn
 import time
 from loguru import logger
 import argparse
-#nohup python run.py --png_save_path run1 >run1.log 2>&1 &
+#nohup python run.py --png_save_path run1 --samples 100 --epochs 50000>run3.log 2>&1 &
 parser = argparse.ArgumentParser()
 parser.add_argument('--png_save_path',type=str,default='debug')
+parser.add_argument('--cuda',type=str,default='cuda')
+parser.add_argument('--words',type=int,default=2)
+parser.add_argument('--samples',type=int,default=100)
+parser.add_argument('--epochs',type=int,default=20000)
 args = parser.parse_args()
 import os
 if os.path.exists(args.png_save_path):
@@ -22,7 +26,7 @@ class SimpleNN(nn.Module):
         self.a0 = nn.Parameter(torch.randn(1))
         
         # omega and alpha are now fixed but defined based on the initialized parameters
-        self.register_buffer('omega', max_freq / torch.arange(1, nums + 1, dtype=torch.float).reshape(1, -1))
+        self.register_buffer('omega', max_freq / nums * torch.arange(1, nums + 1, dtype=torch.float).reshape(1, -1))
         self.register_buffer('alpha', self.omega / 10000)
         self.start_time = nn.Parameter(torch.randn(1))
     
@@ -36,7 +40,7 @@ class SimpleNN(nn.Module):
         return result
 
 class WordVoice(nn.Module):
-    def __init__(self, word=2, nums=100, max_freq=12000):
+    def __init__(self, word=2, nums=300, max_freq=12000):
         super(WordVoice, self).__init__()
         self.word = word
         self.net = nn.ModuleList([SimpleNN(nums, max_freq) for _ in range(word)])
@@ -78,10 +82,12 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import matplotlib.pyplot as plt
+import torchaudio
 if __name__=='__main__':
     # 检查是否有可用的 GPU
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = WordVoice(word=2, nums=100, max_freq=12000).to(device)
+    #device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device(args.cuda if torch.cuda.is_available() else 'cpu')
+    model = WordVoice(word=args.words, nums=args.samples, max_freq=12000).to(device)
     x = t.reshape(-1,1).astype(np.float32)
     y = x_t.reshape(-1,1).astype(np.float32)
     x_tensor = torch.from_numpy(x).to(device)
@@ -89,7 +95,7 @@ if __name__=='__main__':
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=0.01)
     # 训练模型
-    num_epochs = 20000
+    num_epochs = args.epochs
     start_time = time.time()
     for epoch in range(num_epochs):
         model.train()
@@ -126,6 +132,7 @@ if __name__=='__main__':
     plt.grid()
     plt.savefig(f'./{args.png_save_path}/Predict_Amplitude_Time.png', dpi=300, bbox_inches='tight')
     plt.close()
+    torchaudio.save(f'./{args.png_save_path}/Predict_audio.wav', torch.tensor(predicted).reshape(1,-1), 24000)
     #plt.show()
     #for key in model.parameters():
     #    print(key)

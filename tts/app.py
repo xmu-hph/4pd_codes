@@ -80,7 +80,6 @@ def load_model():
         "It took me quite a long time to develop a voice.",
         config,
         speaker_wav="./examples/default.wav",
-        gpt_cond_len=3,
         language="en",
     )
     torch.cuda.empty_cache()
@@ -101,20 +100,20 @@ async def check_ready():
 # Request model for voice cloning
 class VoiceCloneRequest(BaseModel):
     voice_name: str
-    audios: dict
+    audios: list
 
 @app.post("/internal/v1/voice-clone")
 async def internal_voice_clone(request: VoiceCloneRequest):
     try:
-        audio_bytes = request.audios['audio_bytes']
-        audio_format = request.audios['audio_format']
+        audio_bytes = request.audios[0]['audio_bytes']
+        audio_format = request.audios[0]['audio_format']
         voice_name = request.voice_name
 
-        audio_data = np.frombuffer(base64.b64decode(audio_bytes), dtype=np.float32)
-        if max(abs(audio_data)) > 1:
-            audio_data = audio_data.astype(np.int16)
-        else:
-            audio_data = audio_data.astype(np.float32)
+        audio_data = np.frombuffer(base64.b64decode(audio_bytes), dtype=np.int16)
+        #if max(abs(audio_data)) > 1:
+        #    audio_data = audio_data.astype(np.int16)
+        #else:
+        #    audio_data = audio_data.astype(np.float32)
 
         torchaudio.save(f'./examples/{voice_name}.wav', torch.tensor(audio_data).unsqueeze(0), 16000)
         return JSONResponse(status_code=200, content={"voice_name": voice_name, 'status': 2})
@@ -126,6 +125,12 @@ class TTSRequest(BaseModel):
     text: str
     voice_name: str
     language: str
+'''
+class TTSRequest(BaseModel):
+    transcription: str
+    voice_name: str
+    language: str
+'''
 #@app.post("/")
 @app.post("/v1/tts")
 async def synthesize_speech(request: TTSRequest):
