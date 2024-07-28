@@ -3,7 +3,6 @@ import torch.nn as nn
 import time
 from loguru import logger
 import argparse
-#nohup python run.py --png_save_path run1 --samples 100 --epochs 50000>run3.log 2>&1 &
 parser = argparse.ArgumentParser()
 parser.add_argument('--png_save_path',type=str,default='debug')
 parser.add_argument('--cuda',type=str,default='cuda')
@@ -105,6 +104,18 @@ if __name__=='__main__':
         loss.backward()
         optimizer.step()
         if (epoch+1) % 400 == 0:
+            # View parameters of WordVoice
+            logger.info("\nParameters of WordVoice:")
+            for name, param in model.named_parameters():
+                logger.info(f"{name}: {param.shape}")
+            # View buffers of WordVoice
+            logger.info("\nBuffers of WordVoice:")
+            for name, buffer in model.named_buffers():
+                logger.info(f"{name}: {buffer.shape}")
+            # View all parameters and buffers of WordVoice using state_dict
+            logger.info("\nState dict of WordVoice:")
+            for name, param in model.state_dict().items():
+                logger.info(f"{name}: {param.shape}")
             plt.figure(figsize=(10, 4))
             plt.title('$x_{discrete}(t)$')
             plt.xlabel('Time [s]')
