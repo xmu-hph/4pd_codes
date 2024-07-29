@@ -18,4 +18,14 @@ nohup python run.py --png_save_path run12 --samples 1000 --epochs 50000  --words
 
 nohup python run.py --png_save_path run13 --samples 2000 --epochs 50000  --words 2 --cuda 'cuda:2' >run13.log 2>&1 &
 
-nohup python run.py --png_save_path run14 --samples 4000 --epochs 50000  --words 2 --cuda 'cuda:2' >run14.log 2>&1 &
+nohup python run.py --png_save_path run14 --samples 4000 --epochs 500000  --words 2 --cuda 'cuda:7' >run14.log 2>&1 &
+
+nohup python run.py --png_save_path run15 --samples 4000 --epochs 50000  --words 5 --cuda 'cuda:7' >run15.log 2>&1 &
+
+nohup python run.py --png_save_path run16 --samples 4000 --epochs 500000  --words 7 --cuda 'cuda:7' >run16.log 2>&1 &
+
+nohup python run.py --png_save_path run17 --samples 10000 --epochs 500000  --words 2 --cuda 'cuda:7' >run17.log 2>&1 &
+
+nohup python run.py --png_save_path run18 --samples 30000 --epochs 500000  --words 2 --cuda 'cuda:7' >run18.log 2>&1 &
+
+nohup python run.py --png_save_path run19 --samples 30000 --epochs 50000  --words 2 --cuda 'cuda:7' >run18.log 2>&1 &
