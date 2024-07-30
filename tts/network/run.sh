@@ -28,4 +28,32 @@ nohup python run.py --png_save_path run17 --samples 10000 --epochs 500000  --wor
 
 nohup python run.py --png_save_path run18 --samples 30000 --epochs 500000  --words 2 --cuda 'cuda:7' >run18.log 2>&1 &
 
-nohup python run.py --png_save_path run19 --samples 30000 --epochs 50000  --words 2 --cuda 'cuda:7' >run18.log 2>&1 &
+nohup python run.py --png_save_path run19 --samples 1000 --epochs 50000  --words 2 --cuda 'cuda:7' --max_freq 24000 >run19.log 2>&1 &
+
+nohup python run.py --png_save_path run20 --samples 1000 --epochs 50000  --words 3 --cuda 'cuda:7' --max_freq 24000 >run20.log 2>&1 &
+
+nohup python run.py --png_save_path run21 --samples 1000 --epochs 50000  --words 3 --cuda 'cuda:7' --max_freq 48000 >run21.log 2>&1 &
+
+nohup python run.py --png_save_path run22 --samples 1000 --epochs 50000  --words 5 --cuda 'cuda:7' --max_freq 24000 >run22.log 2>&1 &
+
+nohup python run.py --png_save_path run23 --samples 1000 --epochs 50000  --words 5 --cuda 'cuda:7' --max_freq 48000 >run23.log 2>&1 &
+
+nohup python run.py --png_save_path run24 --samples 2000 --epochs 50000  --words 5 --cuda 'cuda:7' --max_freq 48000 >run24.log 2>&1 &
+
+nohup python run.py --png_save_path run25 --samples 3000 --epochs 50000  --words 5 --cuda 'cuda:7' --max_freq 48000 >run25.log 2>&1 &
+
+nohup python run.py --png_save_path run26 --samples 4000 --epochs 50000  --words 5 --cuda 'cuda:7' --max_freq 48000 >run26.log 2>&1 &
+
+nohup python run.py --png_save_path run27 --samples 5000 --epochs 50000  --words 5 --cuda 'cuda:7' --max_freq 48000 >run27.log 2>&1 &
+
+nohup python run.py --png_save_path run28 --samples 4000 --epochs 50000  --words 7 --cuda 'cuda:7' --max_freq 48000 >run28.log 2>&1 &
+
+nohup python run.py --png_save_path run29 --samples 5000 --epochs 500000  --words 5 --cuda 'cuda:7' --max_freq 48000 >run29.log 2>&1 &
+
+nohup python run.py --png_save_path run30 --samples 2000 --epochs 50000  --words 5 --cuda 'cuda:7' --max_freq 48000 --lr 0.0001 >run30.log 2>&1 &
+
+nohup python run.py --png_save_path run31 --samples 2000 --epochs 50000  --words 5 --cuda 'cuda:7' --max_freq 48000 --lr 0.001 >run31.log 2>&1 &
+
+nohup python run.py --png_save_path run32 --samples 2000 --epochs 200000  --words 5 --cuda 'cuda:7' --max_freq 48000 --lr 0.001 >run32.log 2>&1 &
+
+nohup python run.py --png_save_path run33 --samples 2000 --epochs 200000  --words 3 --cuda 'cuda:7' --max_freq 48000 --lr 0.001 >run33.log 2>&1 &

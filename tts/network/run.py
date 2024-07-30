@@ -9,6 +9,8 @@ parser.add_argument('--cuda',type=str,default='cuda')
 parser.add_argument('--words',type=int,default=2)
 parser.add_argument('--samples',type=int,default=100)
 parser.add_argument('--epochs',type=int,default=20000)
+parser.add_argument('--max_freq',type=int,default=12000)
+parser.add_argument('--lr',type=float,default=0.001)
 args = parser.parse_args()
 import os
 if os.path.exists(args.png_save_path):
@@ -68,7 +70,7 @@ t = np.array(list(range(len(data))))*T
 x_t = data
 # 绘制时间域信号 x_discrete(t)
 plt.figure(figsize=(10, 4))
-plt.stem(t[4410:6615], x_t[4410:6615], basefmt=" ")
+plt.stem(t[8500:9000], x_t[8500:9000], basefmt=" ")
 plt.title('$x_{discrete}(t)$')
 plt.xlabel('Time [s]')
 plt.ylabel('Amplitude')
@@ -86,13 +88,13 @@ if __name__=='__main__':
     # 检查是否有可用的 GPU
     #device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     device = torch.device(args.cuda if torch.cuda.is_available() else 'cpu')
-    model = WordVoice(word=args.words, nums=args.samples, max_freq=12000).to(device)
+    model = WordVoice(word=args.words, nums=args.samples, max_freq=args.max_freq).to(device)
     x = t.reshape(-1,1).astype(np.float32)
     y = x_t.reshape(-1,1).astype(np.float32)
     x_tensor = torch.from_numpy(x).to(device)
     y_tensor = torch.from_numpy(y).to(device)
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.01)
+    optimizer = optim.Adam(model.parameters(), lr=args.lr)
     # 训练模型
     num_epochs = args.epochs
     start_time = time.time()
@@ -120,8 +122,8 @@ if __name__=='__main__':
             plt.title('$x_{discrete}(t)$')
             plt.xlabel('Time [s]')
             plt.ylabel('Amplitude')
-            plt.plot(x[4410:6615], y[4410:6615], label='True')
-            plt.plot(x[4410:6615], outputs.detach().cpu().numpy()[4410:6615], label='Predicted')
+            plt.plot(x[8500:9000], y[8500:9000], label='True')
+            plt.plot(x[8500:9000], outputs.detach().cpu().numpy()[8500:9000], label='Predicted')
             plt.legend()
             plt.grid()
             plt.savefig(f'./{args.png_save_path}/Predict_Amplitude_Time_{epoch+1}.png', dpi=300, bbox_inches='tight')
