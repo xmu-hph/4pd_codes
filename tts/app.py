@@ -64,9 +64,6 @@ logger.info(f"模型存放位置为:{device}")
 tts_path = '/root/model/tts'
 tokenizer_path_zh = '/root/model/zh'
 tokenizer_path_en = '/root/model/en'
-#/mnt/data/hupenghui/model/en_core_web_sm-3.7.1/en_core_web_sm/en_core_web_sm-3.7.1
-#/mnt/data/hupenghui/model/zh_core_web_sm-3.7.0/zh_core_web_sm/zh_core_web_sm-3.7.0
-#/mnt/data/hupenghui/model/tts_models--multilingual--multi-dataset--xtts_v2
 def load_model():
     logger.info(f"加载模型阶段")
     global tts_model, tokenizer_model_zh, tts_config, tokenizer_model_en, flag, device, tts_path, tokenizer_path_zh, tokenizer_path_en
@@ -109,9 +106,7 @@ async def internal_voice_clone(request: VoiceCloneRequest):
         audio_bytes = request.audios[0]['audio_bytes']
         audio_format = request.audios[0]['audio_format']
         voice_name = request.voice_name
-
         audio_data = np.frombuffer(base64.b64decode(audio_bytes), dtype=np.int16)
-
         torchaudio.save(f'./examples/{voice_name}.wav', torch.tensor(audio_data).unsqueeze(0), 16000)
         return JSONResponse(status_code=200, content={"voice_name": voice_name, 'status': 2})
     except:
@@ -137,7 +132,7 @@ async def synthesize_speech(request: TTSRequest):
     else:
         voice_name = voice_name
     speaker_wav = f"./examples/{voice_name}.wav"
-    logger.info(f"音色和语言请求分析：{voice_name, language}")
+    logger.info(f"音色和语言请求：{voice_name, language}")
     gpt_cond_latent, speaker_embedding = tts_model.get_conditioning_latents(audio_path=[speaker_wav])
     logger.info(f"音色特征提取完成")
     if lang_map[language] == "zh-cn":
@@ -172,7 +167,7 @@ stream_tts_config = StreamTTSConfig()
 
 @app.websocket("/stream/tts")
 async def websocket_endpoint(websocket: WebSocket):
-    global tts_model, tokenizer_model_zh, tts_config, tokenizer_model_en, flag, device, tts_path, tokenizer_path_zh, tokenizer_path_en
+    global tts_model, tokenizer_model_zh, tts_config, tokenizer_model_en, flag, device, tts_path, tokenizer_path_zh, tokenizer_path_en, stream_tts_config
     logger.info(f"流式合成请求接入")
     await websocket.accept()
     logger.info("流式合成连接建立")
@@ -181,24 +176,28 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             logger.info(f"流式合成的第{receive_stage}阶段")
             message = await websocket.receive_text()
-            #logger.info(message)
             data = json.loads(message)
-            #logger.info(data)
-            logger.info(f"传入参数确认")
+            logger.info(f"参数接收完成，待分析")
             if 'language' in data:
-                logger.info(f"第{receive_stage}阶段是config阶段：{data}")
+                logger.info(f"第{receive_stage}阶段是参数传递阶段，内容为{data}")
                 language = data["language"]
                 voice_name = data["voice_name"]
                 sample_rate = data["sample_rate"]
                 channel = data["channel"]
                 audio_format = data["format"]
                 bits = data["bits"]
-                stream_tts_config = StreamTTSConfig(language=language, voice_name=voice_name, sample_rate=sample_rate, channel=channel, format=audio_format, bits=bits)
+                stream_tts_config = StreamTTSConfig(language=language, \
+                    voice_name=voice_name, \
+                    sample_rate=sample_rate, \
+                    channel=channel, \
+                    format=audio_format, \
+                    bits=bits)
+                logger.info(f"第{receive_stage}阶段，数据解析完成")
                 await websocket.send_text(json.dumps({"success": True}))
-                logger.info(f"第{receive_stage}阶段，回传信息完成")
+                logger.info(f"第{receive_stage}阶段，信息回传完成")
             elif "text" in data:
                 text = data["text"]
-                logger.info(f"第{receive_stage}阶段是text阶段，长度为：{len(text)}")
+                logger.info(f"第{receive_stage}阶段是语音合成阶段，文本长度为：{len(text)}")
                 i = 0
                 b_start = bytes(128)
                 base64_audio_data = base64.b64encode(b_start).decode('utf-8')
@@ -207,8 +206,9 @@ async def websocket_endpoint(websocket: WebSocket):
                     "audio_status": 1,
                     "audio_block_seq": i
                 }
+                logger.info(f"首次空响应合成完成")
                 await websocket.send_text(json.dumps(start_re))
-                logger.info(f"首字响应,sent {i} part")
+                logger.info(f"首字空响应发送完成,sent {i} part")
                 i += 1
                 language = stream_tts_config.language
                 voice_name = stream_tts_config.voice_name
@@ -236,6 +236,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     break
                 logger.info(f"文本分词完成")
                 for par in text.sents:
+                    logger.info(f"本段长度：{len(par.text)}")
                     chunks = tts_model.inference_stream(par.text, lang_map[language], gpt_cond_latent, speaker_embedding, temperature=args.temperature)
                     for _, chunk in enumerate(chunks):
                         resampled_audio = librosa.resample(chunk.cpu().numpy(), orig_sr=24000, target_sr=sample_rate)
@@ -244,10 +245,12 @@ async def websocket_endpoint(websocket: WebSocket):
                             "audio_status": 1,
                             "audio_block_seq": i
                         }
+                        #logger.info(f"响应合成完成")
                         await websocket.send_text(json.dumps(response))
                         logger.info(f"sent {i} part")
                         i += 1
                     torch.cuda.empty_cache()
+                logger.info(f"文本内容发送完成")
                 b = bytes(128)
                 base64_audio_data = base64.b64encode(b).decode('utf-8')
                 response = {
@@ -255,8 +258,9 @@ async def websocket_endpoint(websocket: WebSocket):
                     "audio_status": 2,
                     "audio_block_seq": i
                 }
+                logger.info(f"结束响应合成完成")
                 await websocket.send_text(json.dumps(response))
-                logger.info(f"发送结束片段完成")
+                logger.info(f"结束片段发送完成")
                 i += 1
             else:
                 logger.info(f"Received {data} message")

@@ -27,3 +27,6 @@ done
 # 指指定gpu  1       1
 # 不指定gpu  1       1
 # cpu       1       1
+#/mnt/data/hupenghui/model/en_core_web_sm-3.7.1/en_core_web_sm/en_core_web_sm-3.7.1
+#/mnt/data/hupenghui/model/zh_core_web_sm-3.7.0/zh_core_web_sm/zh_core_web_sm-3.7.0
+#/mnt/data/hupenghui/model/tts_models--multilingual--multi-dataset--xtts_v2
