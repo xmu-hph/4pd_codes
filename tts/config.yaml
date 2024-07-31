@@ -1,6 +1,6 @@
-docker_image: harbor-contest.4pd.io/hupenghui/tts:tts_stream_clone
+docker_image: harbor-contest.4pd.io/hupenghui/tts:tts_stream
 values:
-  command: ["python", "app.py", "--split_length", "40"]
+  command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "80"]
   readinessProbe:
     httpGet:
       path: /ready
@@ -13,10 +13,24 @@ values:
     limits:
       cpu: 1
       memory: 20G
-      #nvidia.com/gpu: 1
+      nvidia.com/gpu: 1
     requests:
       cpu: 1
       memory: 20G
-      #nvidia.com/gpu: 1
-#nodeSelector:
-#  contest.4pd.io/accelerator: A100-SXM4-80GB
+      nvidia.com/gpu: 1
+nodeSelector:
+  contest.4pd.io/accelerator: A100-SXM4-80GB
+leaderboard_options:
+  nfs:
+    - name: tts_model
+      srcRelativePath: hupenghui/model/tts_models--multilingual--multi-dataset--xtts_v2
+      mountPoint: /root/model/tts
+      source: ucloud_juicefs
+    - name: zh_model
+      srcRelativePath: hupenghui/model/zh_core_web_sm-3.7.0/zh_core_web_sm/zh_core_web_sm-3.7.0
+      mountPoint: /root/model/zh
+      source: ucloud_juicefs
+    - name: en_model
+      srcRelativePath: hupenghui/model/en_core_web_sm-3.7.1/en_core_web_sm/en_core_web_sm-3.7.1
+      mountPoint: /root/model/en
+      source: ucloud_juicefs

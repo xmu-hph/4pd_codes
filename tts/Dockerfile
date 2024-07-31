@@ -11,4 +11,5 @@ RUN mkdir /home/xtts
 WORKDIR /home/xtts
 RUN mkdir -p ./examples
 ADD ./examples/* ./examples/
+RUN pip install spacy spacy-pkuseg
 ADD ./app.py .
