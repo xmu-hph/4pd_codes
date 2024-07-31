@@ -1,11 +1,3 @@
-curl --location --request POST 'http://contest.4pd.io:8080/submit' \
-  --header 'Authorization: Bearer a20bec9873586129d1384ba155c0daeb' \
-  --form-string "benchmark=voice_clone" \
-  --form-string 'contributors=hupenghui,liyihao,wangzhangcheng' \
-  --form-string 'source_code=https://gitlab.4pd.io/hupenghui/automl_cad_related' \
-  --form-string 'description=basemodel:tired' \
-  --form 'config_file=@"/home/mnt/4pd_codes/tts/config.yaml"'
-
 for var in en cn; do
   curl --location --request POST 'http://contest.4pd.io:8080/submit' \
     --header 'Authorization: Bearer a20bec9873586129d1384ba155c0daeb' \
@@ -15,6 +7,14 @@ for var in en cn; do
     --form-string 'description=basemodel:tired' \
     --form 'config_file=@"/home/mnt/4pd_codes/tts/config.yaml"'
 done
+
+curl --location --request POST 'http://contest.4pd.io:8080/submit' \
+  --header 'Authorization: Bearer a20bec9873586129d1384ba155c0daeb' \
+  --form-string "benchmark=voice_clone" \
+  --form-string 'contributors=hupenghui,liyihao,wangzhangcheng' \
+  --form-string 'source_code=https://gitlab.4pd.io/hupenghui/automl_cad_related' \
+  --form-string 'description=basemodel:tired' \
+  --form 'config_file=@"/home/mnt/4pd_codes/tts/config.yaml"'
 #a20bec9873586129d1384ba155c0daeb
 #e4849e263e914472
 #voice_clone
