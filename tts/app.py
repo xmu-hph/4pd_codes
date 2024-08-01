@@ -64,9 +64,11 @@ logger.info(f"模型存放位置为:{device}")
 tts_path = '/root/model/tts'
 tokenizer_path_zh = '/root/model/zh'
 tokenizer_path_en = '/root/model/en'
+voice_names = ['default','zh-c-1','zh-f-standard-1','zh-f-sweet-2','zh-m-calm-1','zh-m-standard-1']
+voice_features = {}
 def load_model():
     logger.info(f"加载模型阶段")
-    global tts_model, tokenizer_model_zh, tts_config, tokenizer_model_en, flag, device, tts_path, tokenizer_path_zh, tokenizer_path_en
+    global tts_model, tokenizer_model_zh, tts_config, tokenizer_model_en, flag, device, tts_path, tokenizer_path_zh, tokenizer_path_en, voice_names, voice_features
     tts_config = XttsConfig()
     tts_config.load_json(tts_path+"/config.json")
     tts_model = Xtts.init_from_config(tts_config)
@@ -76,14 +78,19 @@ def load_model():
     tts_model.synthesize(
         "It took me quite a long time to develop a voice.",
         tts_config,
-        speaker_wav="./examples/default.wav",
+        speaker_wav="./examples/zh-c-1.wav",
         language="en",
     )
-    torch.cuda.empty_cache()
+    #torch.cuda.empty_cache()
     logger.info(f"tts模型预热完成")
     tokenizer_model_en = spacy.load(tokenizer_path_en)
     tokenizer_model_zh = spacy.load(tokenizer_path_zh)
     logger.info(f"分词模型加载完成")
+    for voice_name in voice_names:
+        speaker_wav = './examples/' + voice_name + '.wav'
+        gpt_cond_latent, speaker_embedding = tts_model.get_conditioning_latents(audio_path=[speaker_wav])
+        voice_features[voice_name] = {"gpt_cond_latent":gpt_cond_latent,"speaker_embedding":speaker_embedding}
+    logger.info(f"音色特征提取结束")
     flag = True
     logger.info("模型加载线程结束")
 
@@ -102,12 +109,19 @@ class VoiceCloneRequest(BaseModel):
 
 @app.post("/internal/v1/voice-clone")
 async def internal_voice_clone(request: VoiceCloneRequest):
+    logger.info(f"音色克隆请求")
+    global tts_model, tokenizer_model_zh, tts_config, tokenizer_model_en, flag, device, tts_path, tokenizer_path_zh, tokenizer_path_en, voice_names, voice_features
     try:
         audio_bytes = request.audios[0]['audio_bytes']
         audio_format = request.audios[0]['audio_format']
         voice_name = request.voice_name
         audio_data = np.frombuffer(base64.b64decode(audio_bytes), dtype=np.int16)
-        torchaudio.save(f'./examples/{voice_name}.wav', torch.tensor(audio_data).unsqueeze(0), 16000)
+        torchaudio.save(f'./examples/{voice_name}.wav', torch.tensor(audio_data[:min(48000,len(audio_data))]).unsqueeze(0), 16000)
+        logger.info(f"音色文件保存完成")
+        gpt_cond_latent, speaker_embedding = tts_model.get_conditioning_latents(audio_path=[f'./examples/{voice_name}.wav'])
+        logger.info(f"音色特征提取完成")
+        voice_features[voice_name] = {"gpt_cond_latent":gpt_cond_latent,"speaker_embedding":speaker_embedding}
+        logger.info(f"音色特征保存完成")
         return JSONResponse(status_code=200, content={"voice_name": voice_name, 'status': 2})
     except:
         return JSONResponse(status_code=200, content={"voice_name": voice_name, 'status': 3})
@@ -119,7 +133,7 @@ class TTSRequest(BaseModel):
 
 @app.post("/v1/tts")
 async def synthesize_speech(request: TTSRequest):
-    global tts_model, tokenizer_model_zh, tts_config, tokenizer_model_en, flag, device, tts_path, tokenizer_path_zh, tokenizer_path_en
+    global tts_model, tokenizer_model_zh, tts_config, tokenizer_model_en, flag, device, tts_path, tokenizer_path_zh, tokenizer_path_en, voice_names, voice_features
     logger.info(f"非流式合成请求接入")
     transcription = request.text
     voice_name = request.voice_name
@@ -131,10 +145,14 @@ async def synthesize_speech(request: TTSRequest):
         voice_name = re.sub(r'^.{2}', 'zh', voice_name, count=1)
     else:
         voice_name = voice_name
+    gpt_cond_latent = voice_features[voice_name]['gpt_cond_latent']
+    speaker_embedding = voice_features[voice_name]['speaker_embedding']
+    logger.info(f"音色特征提取完成")
+    '''
     speaker_wav = f"./examples/{voice_name}.wav"
     logger.info(f"音色和语言请求：{voice_name, language}")
     gpt_cond_latent, speaker_embedding = tts_model.get_conditioning_latents(audio_path=[speaker_wav])
-    logger.info(f"音色特征提取完成")
+    '''
     if lang_map[language] == "zh-cn":
         text = tokenizer_model_zh(transcription)
     elif lang_map[language] == "en":
@@ -147,7 +165,7 @@ async def synthesize_speech(request: TTSRequest):
         logger.info(f"本段数据长度为：{len(par.text)}")
         chunk = tts_model.inference(par.text, lang_map[language], gpt_cond_latent, speaker_embedding, temperature=args.temperature)
         chunks.append(torch.tensor(chunk['wav']))
-        torch.cuda.empty_cache()
+        #torch.cuda.empty_cache()
     logger.info(f"数据合成完成")
     result = torch.cat(chunks)
     logger.info(f"数据拼接完成")
@@ -164,10 +182,21 @@ class StreamTTSConfig(BaseModel):
     bits: int = 16
 
 stream_tts_config = StreamTTSConfig()
+def text_chunk_generator(text, chunk_size=30):
+    """
+    生成一个不超过chunk_size字符的字符串生成器
+    :param text: 超长文本串
+    :param chunk_size: 每个生成的字符串的最大长度
+    :return: 生成器，每次生成一个不超过chunk_size字符的字符串
+    """
+    start = 0
+    while start < len(text):
+        yield text[start:start + chunk_size]
+        start += chunk_size
 
 @app.websocket("/stream/tts")
 async def websocket_endpoint(websocket: WebSocket):
-    global tts_model, tokenizer_model_zh, tts_config, tokenizer_model_en, flag, device, tts_path, tokenizer_path_zh, tokenizer_path_en, stream_tts_config
+    global tts_model, tokenizer_model_zh, tts_config, tokenizer_model_en, flag, device, tts_path, tokenizer_path_zh, tokenizer_path_en, stream_tts_config, voice_names, voice_features
     logger.info(f"流式合成请求接入")
     await websocket.accept()
     logger.info("流式合成连接建立")
@@ -223,9 +252,13 @@ async def websocket_endpoint(websocket: WebSocket):
                     voice_name = re.sub(r'^.{2}', 'zh', voice_name, count=1)
                 else:
                     voice_name = voice_name
+                '''
                 speaker_wav = './examples/' + voice_name + '.wav'
                 logger.info(f"音色信息：{speaker_wav}")
                 gpt_cond_latent, speaker_embedding = tts_model.get_conditioning_latents(audio_path=[speaker_wav])
+                '''
+                gpt_cond_latent = voice_features[voice_name]['gpt_cond_latent']
+                speaker_embedding = voice_features[voice_name]['speaker_embedding']
                 logger.info(f"音色特征提取完成")
                 if lang_map[language] == "zh-cn":
                     text = tokenizer_model_zh(text)
@@ -249,7 +282,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         await websocket.send_text(json.dumps(response))
                         logger.info(f"sent {i} part")
                         i += 1
-                    torch.cuda.empty_cache()
+                    #torch.cuda.empty_cache()
                 logger.info(f"文本内容发送完成")
                 b = bytes(128)
                 base64_audio_data = base64.b64encode(b).decode('utf-8')

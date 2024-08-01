@@ -9,4 +9,5 @@ RUN pip install spacy spacy-pkuseg transformers
 EXPOSE 80
 RUN mkdir /home/code
 WORKDIR /home/code
+RUN pip install accelerate
 ADD ./app.py .
