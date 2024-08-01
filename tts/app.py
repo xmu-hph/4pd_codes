@@ -224,6 +224,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 logger.info(f"  第{receive_stage}阶段是语音合成阶段，字符数量为：{len(text)}")
                 logger.info(f"  第{receive_stage}阶段，数据解析完成")
                 i = 0
+                '''
                 b_start = bytes(128)
                 base64_audio_data = base64.b64encode(b_start).decode('utf-8')
                 start_re = {
@@ -235,6 +236,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 await websocket.send_text(json.dumps(start_re))
                 logger.info(f"  首字响应发送完成,sent {i} part")
                 i += 1
+                '''
                 language = stream_tts_config.language
                 voice_name = stream_tts_config.voice_name
                 sample_rate = stream_tts_config.sample_rate
