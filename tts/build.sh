@@ -1,7 +1,7 @@
 #!/bin/bash
 set -Ceu
 imgroot="harbor-contest.4pd.io/hupenghui/tts:"
-imgtag="tts_clone_cache"
+imgtag="tts_stream_clone_1655"
 #tts_clone
 #tts_stream
 #tts_standard

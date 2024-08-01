@@ -1,6 +1,9 @@
-docker_image: harbor-contest.4pd.io/hupenghui/tts:tts_clone_cache
+docker_image: harbor-contest.4pd.io/hupenghui/tts:tts_stream_clone_1655
 values:
   command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "80"]
+  env:
+    - name: max_length
+      value: 45
   readinessProbe:
     httpGet:
       path: /ready
