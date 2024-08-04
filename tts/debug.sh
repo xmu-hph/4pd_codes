@@ -5,10 +5,17 @@ docker run --rm -it --gpus '"device=6"' --network host \
 -e GPU_CORE_UTILIZATION_POLICY=force \
 -v /home/hupenghui/vgpu/libvgpu.so:/usr/local/vgpu/libvgpu.so \
 -v /home/hupenghui/vgpulock:/tmp/vgpulock \
+<<<<<<< HEAD
 harbor-contest.4pd.io/hupenghui/tts:tts_stream_clone_1655 /bin/bash
 #-v /mnt/data/hupenghui/model/tts_models--multilingual--multi-dataset--xtts_v2:/root/model/tts \
 #-v /mnt/data/hupenghui/model/zh_core_web_sm-3.7.0/zh_core_web_sm/zh_core_web_sm-3.7.0:/root/model/zh \
 #-v /mnt/data/hupenghui/model/en_core_web_sm-3.7.1/en_core_web_sm/en_core_web_sm-3.7.1:/root/model/en \
+=======
+-v /mnt/data/hupenghui/model/tts_models--multilingual--multi-dataset--xtts_v2:/root/model/tts \
+-v /mnt/data/hupenghui/model/zh_core_web_sm-3.7.0/zh_core_web_sm/zh_core_web_sm-3.7.0:/root/model/zh \
+-v /mnt/data/hupenghui/model/en_core_web_sm-3.7.1/en_core_web_sm/en_core_web_sm-3.7.1:/root/model/en \
+harbor-contest.4pd.io/hupenghui/tts:tts_stream_clone_1655 /bin/bash
+>>>>>>> parent of 16fe679 (remove first null response)
 
 
 

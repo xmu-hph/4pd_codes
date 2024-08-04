@@ -1,9 +1,13 @@
-docker_image: harbor-contest.4pd.io/hupenghui/tts:tts_stream_clone_without_zero_res
+docker_image: harbor-contest.4pd.io/hupenghui/tts:tts_stream_clone_1655
 values:
   command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "80"]
   env:
     - name: max_length
+<<<<<<< HEAD
       value: 35
+=======
+      value: 45
+>>>>>>> parent of 16fe679 (remove first null response)
   readinessProbe:
     httpGet:
       path: /ready
