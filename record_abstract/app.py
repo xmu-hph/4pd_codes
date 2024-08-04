@@ -1,12 +1,15 @@
-import threading
 import numpy as np
+import threading
+import subprocess
+from openai import OpenAI, APIConnectionError
 import torch
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from loguru import logger
 from pydantic import BaseModel
 import spacy
-from transformers import AutoModelForCausalLM, AutoTokenizer
+import json
+from vllm_utils import run_vllm_server
 
 class Myargs(BaseModel):
     device: str = 'cuda'
@@ -15,42 +18,15 @@ app = FastAPI()
 
 logger.info(f"预加载大语言模型和分段模型")
 big_model = None
-big_tokenizer = None
 tokenizer_model_zh = None
 flag = False
 device = args.device if torch.cuda.is_available() else "cpu"
 logger.info(f"模型存放位置为:{device}")
-big_path = '/root/model/big'
-tokenizer_path_zh = '/root/model/zh'
+tokenizer_path_zh = '/root/model/zh/zh_core_web_sm-3.7.0/zh_core_web_sm/zh_core_web_sm-3.7.0'
 def load_model():
     logger.info(f"加载模型阶段")
-    global big_model, big_tokenizer, tokenizer_model_zh, flag, device, big_path, tokenizer_path_zh
-    big_model = AutoModelForCausalLM.from_pretrained(
-        big_path,
-        torch_dtype="auto",
-        device_map="auto")
-    big_tokenizer = AutoTokenizer.from_pretrained(big_path)
-    logger.info(f"大语言模型模型加载完成")
-    prompt = "Give me a short introduction to large language model."
-    messages = [
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": prompt}
-        ]
-    text = big_tokenizer.apply_chat_template(
-        messages,
-        tokenize=False,
-        add_generation_prompt=True
-        )
-    model_inputs = big_tokenizer([text], return_tensors="pt").to(device)
-    generated_ids = big_model.generate(
-                    **model_inputs,
-                    max_new_tokens=512
-                    )
-    generated_ids = [
-                output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
-                    ]
-    response = big_tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
-    logger.info(f"test_response:{response}")
+    global big_model, tokenizer_model_zh, flag, device, tokenizer_path_zh
+    big_model = run_vllm_server()
     torch.cuda.empty_cache()
     logger.info(f"大语言模型预热完成")
     tokenizer_model_zh = spacy.load(tokenizer_path_zh)
@@ -72,34 +48,27 @@ class VoiceCloneRequest(BaseModel):
 
 @app.post("/api/v1/generation/summarization")
 async def internal_voice_clone(request: VoiceCloneRequest):
-    global big_model, big_tokenizer, tokenizer_model_zh, tokenizer_model_en, flag, device, big_path, tokenizer_path_zh, tokenizer_path_en
+    global big_model, tokenizer_model_zh, flag, device, tokenizer_path_zh
     try:
         transcription = request.content
         texts = tokenizer_model_zh(transcription)
-        all_res = []
+        all_res = ''
         for par in texts.sents:
+            #logger.info(par.text)
             logger.info(f"本段数据长度为：{len(par.text)}")
-            prompt = f"从下列文本中提取出摘要句:{par.text}"
-            messages = [
-                        {"role": "system", "content": "You are a helpful assistant."},
-                        {"role": "user", "content": prompt}
-                        ]
-            text = big_tokenizer.apply_chat_template(
-                messages,
-                tokenize=False,
-                add_generation_prompt=True
-                )
-            model_inputs = big_tokenizer([text], return_tensors="pt").to(device)
-            generated_ids = big_model.generate(
-                                            **model_inputs,
-                                            max_new_tokens=512
-                                            )
-            generated_ids = [
-                            output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
-                            ]
-            response = big_tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
-            all_res.append(response)
+            prompt = f"请从下面给出的段落中提取出能够概括本段的句子:{par.text}注意：你必须只输出摘要句子，其他信息不要输出。如果无法提取摘要句子就输出'。'。"
+            response = big_model.chat.completions.create(
+              model="llm",
+              messages=[
+                {"role": "user", "content": prompt}
+              ]
+            )
+            logger.info(f"temp response:{response}")
+            response = json.loads(response.model_dump_json())
+            logger.info(f"json load response:{response}")
+            all_res += response['choices'][0]['message']['content'].strip('"')
+            #all_res.append(response['choices'][0]['message']['content'])
             torch.cuda.empty_cache()
-        return JSONResponse(status_code=200, content={"summarization":{"paragraphSummary":''.join(all_res)}})
+        return JSONResponse(status_code=200, content={"summarization":{"paragraphSummary":all_res}})
     except:
         return JSONResponse(status_code=200, content={"summarization":{"paragraphSummary":"error"}})

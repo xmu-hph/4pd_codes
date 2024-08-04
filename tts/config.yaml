@@ -1,6 +1,9 @@
 docker_image: harbor-contest.4pd.io/hupenghui/tts:tts_stream_clone_without_zero_res
 values:
-  command: ["max_length=50", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "80"]
+  command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "80"]
+  env:
+    - name: max_length
+      value: 35
   readinessProbe:
     httpGet:
       path: /ready
@@ -20,17 +23,17 @@ values:
       nvidia.com/gpu: 1
 #nodeSelector:
 #  contest.4pd.io/accelerator: A100-SXM4-80GB
-leaderboard_options:
-  nfs:
-    - name: tts_model
-      srcRelativePath: hupenghui/model/tts_models--multilingual--multi-dataset--xtts_v2
-      mountPoint: /root/model/tts
-      source: ucloud_juicefs
-    - name: zh_model
-      srcRelativePath: hupenghui/model/zh_core_web_sm-3.7.0/zh_core_web_sm/zh_core_web_sm-3.7.0
-      mountPoint: /root/model/zh
-      source: ucloud_juicefs
-    - name: en_model
-      srcRelativePath: hupenghui/model/en_core_web_sm-3.7.1/en_core_web_sm/en_core_web_sm-3.7.1
-      mountPoint: /root/model/en
-      source: ucloud_juicefs
+#leaderboard_options:
+#  nfs:
+#    - name: tts_model
+#      srcRelativePath: hupenghui/model/tts_models--multilingual--multi-dataset--xtts_v2
+#      mountPoint: /root/model/tts
+#      source: ucloud_juicefs
+#    - name: zh_model
+#      srcRelativePath: hupenghui/model/zh_core_web_sm-3.7.0/zh_core_web_sm/zh_core_web_sm-3.7.0
+#      mountPoint: /root/model/zh
+#      source: ucloud_juicefs
+#    - name: en_model
+#      srcRelativePath: hupenghui/model/en_core_web_sm-3.7.1/en_core_web_sm/en_core_web_sm-3.7.1
+#      mountPoint: /root/model/en
+#      source: ucloud_juicefs

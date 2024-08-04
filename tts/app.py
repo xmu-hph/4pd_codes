@@ -63,9 +63,9 @@ tokenizer_model_en = None
 flag = False
 device = args.device if torch.cuda.is_available() else "cpu"
 logger.info(f"模型存放位置为:{device}")
-tts_path = '/root/model/tts'
-tokenizer_path_zh = '/root/model/zh'
-tokenizer_path_en = '/root/model/en'
+tts_path = '/root/.local/share/tts/tts_models--multilingual--multi-dataset--xtts_v2'
+tokenizer_path_zh = '/root/model/zh_1/zh_core_web_sm-3.7.0/zh_core_web_sm/zh_core_web_sm-3.7.0'
+tokenizer_path_en = '/root/model/en_1/en_core_web_sm-3.7.1/en_core_web_sm/en_core_web_sm-3.7.1'
 voice_names = ['default','zh-c-1','zh-f-standard-1','zh-f-sweet-2','zh-m-calm-1','zh-m-standard-1']
 voice_features = {}
 def load_model():
@@ -193,13 +193,15 @@ stream_tts_config = StreamTTSConfig()
 async def websocket_endpoint(websocket: WebSocket):
     global tts_model, tokenizer_model_zh, tts_config, tokenizer_model_en, flag, device, tts_path, tokenizer_path_zh, tokenizer_path_en, stream_tts_config, voice_names, voice_features
     logger.info(f"流式合成请求接入")
-    await websocket.accept()
+    await asyncio.wait_for(websocket.accept(), timeout=100)
+    #await websocket.accept()
     logger.info(f"流式合成连接建立")
     try:
         receive_stage = 0
         while True:
             logger.info(f"流式合成的第{receive_stage}阶段")
-            message = await websocket.receive_text()
+            message = await asyncio.wait_for(websocket.receive_text(), timeout=100)
+            #message = await websocket.receive_text()
             data = json.loads(message)
             logger.info(f"  参数接收完成，待分析")
             if 'language' in data:
@@ -217,26 +219,26 @@ async def websocket_endpoint(websocket: WebSocket):
                     format=audio_format, \
                     bits=bits)
                 logger.info(f"  第{receive_stage}阶段，数据解析完成")
-                await websocket.send_text(json.dumps({"success": True}))
+                await asyncio.wait_for(websocket.send_text(json.dumps({"success": True})), timeout=100)
+                #await websocket.send_text(json.dumps({"success": True}))
                 logger.info(f"  第{receive_stage}阶段，信息回传完成")
             elif "text" in data:
                 text = data["text"]
                 logger.info(f"  第{receive_stage}阶段是语音合成阶段，字符数量为：{len(text)}")
                 logger.info(f"  第{receive_stage}阶段，数据解析完成")
                 i = 0
-                '''
                 b_start = bytes(128)
                 base64_audio_data = base64.b64encode(b_start).decode('utf-8')
                 start_re = {
-                    "data": base64_audio_data,
+                    "data": str(base64_audio_data),
                     "audio_status": 1,
                     "audio_block_seq": i
                 }
                 logger.info(f"  首次响应合成完成")
-                await websocket.send_text(json.dumps(start_re))
+                await asyncio.wait_for(websocket.send_text(json.dumps(start_re,ensure_ascii=False)), timeout=100)
+                #await websocket.send_text(json.dumps(start_re))
                 logger.info(f"  首字响应发送完成,sent {i} part")
                 i += 1
-                '''
                 language = stream_tts_config.language
                 voice_name = stream_tts_config.voice_name
                 sample_rate = stream_tts_config.sample_rate
@@ -274,7 +276,8 @@ async def websocket_endpoint(websocket: WebSocket):
                             "audio_block_seq": i
                         }
                         #logger.info(f"响应合成完成")
-                        await websocket.send_text(json.dumps(response))
+                        await asyncio.wait_for(websocket.send_text(json.dumps(response)), timeout=100)
+                        #await websocket.send_text(json.dumps(response))
                         logger.info(f"      sent {i} part")
                         i += 1
                     torch.cuda.empty_cache()
@@ -282,12 +285,13 @@ async def websocket_endpoint(websocket: WebSocket):
                 b = bytes(128)
                 base64_audio_data = base64.b64encode(b).decode('utf-8')
                 response = {
-                    "data": base64_audio_data,
+                    "data": str(base64_audio_data),
                     "audio_status": 2,
                     "audio_block_seq": i
                 }
                 logger.info(f"  结束响应合成完成")
-                await websocket.send_text(json.dumps(response))
+                await asyncio.wait_for(websocket.send_text(json.dumps(response)), timeout=100)
+                #await websocket.send_text(json.dumps(response))
                 logger.info(f"  结束响应发送完成")
                 i += 1
                 logger.info(f"  第{receive_stage}阶段，信息回传完成")

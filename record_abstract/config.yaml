@@ -1,4 +1,4 @@
-docker_image: harbor-contest.4pd.io/hupenghui/summarize:qwen-spacy
+docker_image: harbor.4pd.io/lab-platform/pk_platform/model_services/basemodel_ability_hupenghui:german
 values:
   command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "80"]
   readinessProbe:
@@ -12,21 +12,21 @@ values:
   resources:
     limits:
       cpu: 8
-      memory: 32Gi
+      memory: 32G
       nvidia.com/gpu: 2
     requests:
-      cpu: 8
-      memory: 32Gi
-      nvidia.com/gpu: 2
+      cpu: 4
+      memory: 24G
+      nvidia.com/gpu: 1
   nodeSelector:
     contest.4pd.io/accelerator: A100-SXM4-80GB
-leaderboard_options:
-  nfs:
-    - name: big_model
-      srcRelativePath: liyihao/model_zoo/model-qwen2-7b-instruct
-      mountPoint: /root/model/big
-      source: ucloud_juicefs
-    - name: zh_model
-      srcRelativePath: hupenghui/model/zh_core_web_sm-3.7.0/zh_core_web_sm/zh_core_web_sm-3.7.0
-      mountPoint: /root/model/zh
-      source: ucloud_juicefs
+#leaderboard_options:
+#  nfs:
+#    - name: big_model
+#      srcRelativePath: liyihao/model_zoo/model-qwen2-7b-instruct
+#      mountPoint: /root/model/big
+#      source: ucloud_juicefs
+#    - name: zh_model
+#      srcRelativePath: hupenghui/model/zh_core_web_sm-3.7.0/zh_core_web_sm/zh_core_web_sm-3.7.0
+#      mountPoint: /root/model/zh
+#      source: ucloud_juicefs
