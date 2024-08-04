@@ -56,14 +56,14 @@ async def internal_voice_clone(request: VoiceCloneRequest):
         for par in texts.sents:
             #logger.info(par.text)
             logger.info(f"本段数据长度为：{len(par.text)}")
-            prompt = f"从给出的段落中提取出摘要句子:{par.text}直接输出摘要句子，不用包含其他内容。如果没有摘要句子则输出句号'。'"
+            prompt = f"下面的内容可能是段落或非段落，需要你从给出的内容中尽可能提取出摘要句子，注意直接输出摘要句子，不用包含其他内容。如果没有摘要句子或者不是段落则输出句号'。'，给定的内容为：{par.text}"
             response = big_model.chat.completions.create(
               model="llm",
               messages=[
                 {"role": "user", "content": prompt}
               ]
             )
-            logger.info(f"temp response:{response}")
+            #logger.info(f"temp response:{response}")
             response = json.loads(response.model_dump_json())
             logger.info(f"json load response:{response}")
             all_res += response['choices'][0]['message']['content'].strip('"')
