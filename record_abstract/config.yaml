@@ -16,7 +16,7 @@ values:
       nvidia.com/gpu: 2
     requests:
       cpu: 8
-      memory: 32Gi
+      memory: 24Gi
       nvidia.com/gpu: 2
   nodeSelector:
     contest.4pd.io/accelerator: A100-SXM4-80GB
