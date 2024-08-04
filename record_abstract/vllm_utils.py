@@ -2,7 +2,6 @@ from openai import OpenAI
 from openai import APIConnectionError
 import time
 import subprocess
-from subprocess import DEVNULL
 from loguru import logger
 
 def run_vllm_server(probe_gap=5):

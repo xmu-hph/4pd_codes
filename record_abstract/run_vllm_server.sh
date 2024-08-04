@@ -1,4 +1,4 @@
-#export MKL_THREADING_LAYER=GNU
+export MKL_THREADING_LAYER=GNU
 unset http_proxy
 unset https_proxy
 model_id=/root/Qwen2-7B-Instruct
