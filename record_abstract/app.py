@@ -51,6 +51,18 @@ async def internal_voice_clone(request: VoiceCloneRequest):
     global big_model, tokenizer_model_zh, flag, device, tokenizer_path_zh
     try:
         transcription = request.content
+        texts = transcription
+        prompt = f"下面是一个中文会议纪录，有多个参会人员，请你按会议主要语言抽取要句。可以理解为：输入是切片后的会议逐字稿，输出是按原句顺序排序拼接为一个段落的要句原句。会议记录内容为：{texts}"
+        response = big_model.chat.completions.create(
+              model="llm",
+              messages=[
+                {"role": "user", "content": prompt}
+              ]
+            )
+        response = json.loads(response.model_dump_json())
+        all_res = response['choices'][0]['message']['content'].strip('"')
+        torch.cuda.empty_cache()
+        '''
         texts = tokenizer_model_zh(transcription)
         all_res = ''
         for par in texts.sents:
@@ -69,6 +81,8 @@ async def internal_voice_clone(request: VoiceCloneRequest):
             all_res += response['choices'][0]['message']['content'].strip('"')
             #all_res.append(response['choices'][0]['message']['content'])
             torch.cuda.empty_cache()
+        '''
+        
         return JSONResponse(status_code=200, content={"summarization":{"paragraphSummary":all_res}})
     except:
         return JSONResponse(status_code=200, content={"summarization":{"paragraphSummary":"error"}})
