@@ -18,6 +18,8 @@ import os
 import spacy
 from TTS.tts.configs.xtts_config import XttsConfig
 from TTS.tts.models.xtts import Xtts
+import concurrent.futures
+executor = concurrent.futures.ThreadPoolExecutor()
 
 class Myargs(BaseModel):
     length: int = int(os.getenv('max_length', 30))
@@ -68,9 +70,10 @@ tokenizer_path_zh = '/root/model/zh_1/zh_core_web_sm-3.7.0/zh_core_web_sm/zh_cor
 tokenizer_path_en = '/root/model/en_1/en_core_web_sm-3.7.1/en_core_web_sm/en_core_web_sm-3.7.1'
 voice_names = ['default','zh-c-1','zh-f-standard-1','zh-f-sweet-2','zh-m-calm-1','zh-m-standard-1']
 voice_features = {}
+voice_features_ready = {}
 def load_model():
     logger.info(f"加载模型阶段")
-    global tts_model, tokenizer_model_zh, tts_config, tokenizer_model_en, flag, device, tts_path, tokenizer_path_zh, tokenizer_path_en, voice_names, voice_features
+    global tts_model, tokenizer_model_zh, tts_config, tokenizer_model_en, flag, device, tts_path, tokenizer_path_zh, tokenizer_path_en, voice_names, voice_features, voice_features_ready
     tts_config = XttsConfig()
     tts_config.load_json(tts_path+"/config.json")
     tts_model = Xtts.init_from_config(tts_config)
@@ -92,6 +95,7 @@ def load_model():
         speaker_wav = './examples/' + voice_name + '.wav'
         gpt_cond_latent, speaker_embedding = tts_model.get_conditioning_latents(audio_path=[speaker_wav])
         voice_features[voice_name] = {"gpt_cond_latent":gpt_cond_latent,"speaker_embedding":speaker_embedding}
+        voice_features_ready[voice_name] = 1
     logger.info(f"音色特征提取结束")
     flag = True
     logger.info("模型加载线程结束")
@@ -111,23 +115,36 @@ class VoiceCloneRequest(BaseModel):
 
 @app.post("/internal/v1/voice-clone")
 async def internal_voice_clone(request: VoiceCloneRequest):
+    start_time = time.time()
     logger.info(f"音色克隆请求")
-    global tts_model, tokenizer_model_zh, tts_config, tokenizer_model_en, flag, device, tts_path, tokenizer_path_zh, tokenizer_path_en, voice_names, voice_features
+    global tts_model, tokenizer_model_zh, tts_config, tokenizer_model_en, flag, device, tts_path, tokenizer_path_zh, tokenizer_path_en, voice_names, voice_features, voice_features_ready
     try:
         audio_bytes = request.audios[0]['audio_bytes']
         audio_format = request.audios[0]['audio_format']
         voice_name = request.voice_name
+        logger.info(f"{voice_name} request")
         audio_data = np.frombuffer(base64.b64decode(audio_bytes), dtype=np.int16)
         torchaudio.save(f'./examples/{voice_name}.wav', torch.tensor(audio_data[:min(48000,len(audio_data))]).unsqueeze(0), 16000)
         logger.info(f"  音色文件保存完成")
-        gpt_cond_latent, speaker_embedding = tts_model.get_conditioning_latents(audio_path=[f'./examples/{voice_name}.wav'])
-        logger.info(f"  音色特征提取完成")
-        voice_features[voice_name] = {"gpt_cond_latent":gpt_cond_latent,"speaker_embedding":speaker_embedding}
-        logger.info(f"  音色特征保存完成")
+        voice_features_ready[voice_name] = 0
+        t = threading.Thread(target=get_voice_features, args=(tts_model,f'./examples/{voice_name}.wav',voice_name,voice_features,voice_features_ready))
+        t.start()
+        while time.time() < start_time+8:
+            time.sleep(1)
+        #result = executor.submit(get_voice_features,tts_model,f'./examples/{voice_name}.wav',voice_name,voice_features,voice_features_ready)
+        #gpt_cond_latent, speaker_embedding = tts_model.get_conditioning_latents(audio_path=[f'./examples/{voice_name}.wav'])
+        #logger.info(f"  音色特征提取完成")
+        #voice_features[voice_name] = {"gpt_cond_latent":gpt_cond_latent,"speaker_embedding":speaker_embedding}
+        #logger.info(f"  音色特征保存完成")
         return JSONResponse(status_code=200, content={"voice_name": voice_name, 'status': 2})
     except:
         return JSONResponse(status_code=200, content={"voice_name": voice_name, 'status': 3})
-
+def get_voice_features(tts_model,audio_path,voice_name,voice_features,voice_features_ready):
+    gpt_cond_latent, speaker_embedding = tts_model.get_conditioning_latents(audio_path=[audio_path])
+    voice_features[voice_name] = {"gpt_cond_latent":gpt_cond_latent,"speaker_embedding":speaker_embedding}
+    voice_features_ready[voice_name] = 1
+    logger.info(f"{voice_name} ready!")
+    
 class TTSRequest(BaseModel):
     text: str
     voice_name: str
@@ -141,7 +158,7 @@ def text_chunk_generator(text, chunk_size=30):
         
 @app.post("/v1/tts")
 async def synthesize_speech(request: TTSRequest):
-    global tts_model, tokenizer_model_zh, tts_config, tokenizer_model_en, flag, device, tts_path, tokenizer_path_zh, tokenizer_path_en, voice_names, voice_features
+    global tts_model, tokenizer_model_zh, tts_config, tokenizer_model_en, flag, device, tts_path, tokenizer_path_zh, tokenizer_path_en, voice_names, voice_features, voice_features_ready
     logger.info(f"非流式合成请求接入")
     transcription = request.text
     voice_name = request.voice_name
@@ -153,6 +170,8 @@ async def synthesize_speech(request: TTSRequest):
         voice_name = re.sub(r'^.{2}', 'zh', voice_name, count=1)
     else:
         voice_name = voice_name
+    while voice_features_ready[voice_name] == 0:
+        time.sleep(1)
     gpt_cond_latent = voice_features[voice_name]['gpt_cond_latent']
     speaker_embedding = voice_features[voice_name]['speaker_embedding']
     logger.info(f"  音色特征提取完成")
@@ -162,7 +181,7 @@ async def synthesize_speech(request: TTSRequest):
         text = tokenizer_model_en(transcription)
     else:
         logger.info(f"  不支持此语言")
-        return JSONResponse(status_code=200, content={"audio": base64.b64encode(bytes(128)).decode('utf-8')})
+        return JSONResponse(status_code=200, content={"audio": str(base64.b64encode(bytes(128)).decode('utf-8'))})
     logger.info(f"  单字词分割完成")
     generator = text_chunk_generator(text, chunk_size=args.length)
     logger.info(f"  段落分割完成")
@@ -177,7 +196,7 @@ async def synthesize_speech(request: TTSRequest):
     logger.info(f"  数据拼接完成")
     resampled_audio = result.cpu().numpy()
     logger.info(f"  重采样完成")
-    return JSONResponse(status_code=200, content={"audio": base64.b64encode(resampled_audio.tobytes()).decode('utf-8')})
+    return JSONResponse(status_code=200, content={"audio": str(base64.b64encode(resampled_audio.tobytes()).decode('utf-8'))})
 
 class StreamTTSConfig(BaseModel):
     language: str = 'en'
@@ -191,7 +210,7 @@ stream_tts_config = StreamTTSConfig()
 
 @app.websocket("/stream/tts")
 async def websocket_endpoint(websocket: WebSocket):
-    global tts_model, tokenizer_model_zh, tts_config, tokenizer_model_en, flag, device, tts_path, tokenizer_path_zh, tokenizer_path_en, stream_tts_config, voice_names, voice_features
+    global tts_model, tokenizer_model_zh, tts_config, tokenizer_model_en, flag, device, tts_path, tokenizer_path_zh, tokenizer_path_en, stream_tts_config, voice_names, voice_features, voice_features_ready
     logger.info(f"流式合成请求接入")
     await asyncio.wait_for(websocket.accept(), timeout=100)
     #await websocket.accept()
@@ -252,6 +271,8 @@ async def websocket_endpoint(websocket: WebSocket):
                     voice_name = re.sub(r'^.{2}', 'zh', voice_name, count=1)
                 else:
                     voice_name = voice_name
+                while voice_features_ready[voice_name] == 0:
+                    time.sleep(1)
                 gpt_cond_latent = voice_features[voice_name]['gpt_cond_latent']
                 speaker_embedding = voice_features[voice_name]['speaker_embedding']
                 logger.info(f"  音色特征提取完成")
@@ -271,7 +292,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     for _, chunk in enumerate(chunks):
                         resampled_audio = librosa.resample(chunk.cpu().numpy(), orig_sr=24000, target_sr=sample_rate)
                         response = {
-                            "data": base64.b64encode(resampled_audio.tobytes()).decode('utf-8'),
+                            "data": str(base64.b64encode(resampled_audio.tobytes()).decode('utf-8')),
                             "audio_status": 1,
                             "audio_block_seq": i
                         }
