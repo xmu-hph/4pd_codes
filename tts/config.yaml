@@ -1,9 +1,13 @@
-docker_image: harbor-contest.4pd.io/hupenghui/tts:tts_stream_clone_1059
+docker_image: harbor-contest.4pd.io/hupenghui/tts:tts_stream_clone_1002
 values:
   command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "80"]
   env:
     - name: max_length
-      value: 45
+      value: 30
+    - name: zh_en
+      value: 1.5
+    - name: trunced
+      value: 2
   readinessProbe:
     httpGet:
       path: /ready
@@ -11,7 +15,7 @@ values:
     initialDelaySeconds: 60
     periodSeconds: 10
     timeoutSeconds: 1
-    failureThreshold: 10000
+    failureThreshold: 1000
   resources:
     limits:
       cpu: 1
@@ -21,8 +25,10 @@ values:
       cpu: 1
       memory: 16G
       nvidia.com/gpu: 1
-#nodeSelector:
-#  contest.4pd.io/accelerator: A100-SXM4-80GB
+#  nodeSelector:
+#    contest.4pd.io/accelerator: A100-SXM4-80GBvgpu
+#A10
+#A100-SXM4-80GB
 #leaderboard_options:
 #  nfs:
 #    - name: tts_model

@@ -18,14 +18,14 @@ import os
 import spacy
 from TTS.tts.configs.xtts_config import XttsConfig
 from TTS.tts.models.xtts import Xtts
-import concurrent.futures
-executor = concurrent.futures.ThreadPoolExecutor()
 
 class Myargs(BaseModel):
     length: int = int(os.getenv('max_length', 30))
     device: str = 'cuda'
     temperature: float = 0.7
     sample_rate: int = 24000
+    zh_en: float = float(os.getenv('zh_en', 1.5))
+    trunced: int = int(os.getenv('trunced', 15))
 args = Myargs()
 logger.info(args)
 app = FastAPI()
@@ -94,8 +94,10 @@ def load_model():
     for voice_name in voice_names:
         speaker_wav = './examples/' + voice_name + '.wav'
         gpt_cond_latent, speaker_embedding = tts_model.get_conditioning_latents(audio_path=[speaker_wav])
+        #logger.info(gpt_cond_latent)
         voice_features[voice_name] = {"gpt_cond_latent":gpt_cond_latent,"speaker_embedding":speaker_embedding}
         voice_features_ready[voice_name] = 1
+        torch.cuda.empty_cache()
     logger.info(f"音色特征提取结束")
     flag = True
     logger.info("模型加载线程结束")
@@ -127,9 +129,10 @@ async def internal_voice_clone(request: VoiceCloneRequest):
         torchaudio.save(f'./examples/{voice_name}.wav', torch.tensor(audio_data[:min(48000,len(audio_data))]).unsqueeze(0), 16000)
         logger.info(f"  音色文件保存完成")
         voice_features_ready[voice_name] = 0
+        #executor.submit(get_voice_features,tts_model,f'./examples/{voice_name}.wav',voice_name,voice_features,voice_features_ready)
         t = threading.Thread(target=get_voice_features, args=(tts_model,f'./examples/{voice_name}.wav',voice_name,voice_features,voice_features_ready))
         t.start()
-        while time.time() < start_time+8:
+        while time.time() < start_time+7:
             time.sleep(1)
         #result = executor.submit(get_voice_features,tts_model,f'./examples/{voice_name}.wav',voice_name,voice_features,voice_features_ready)
         #gpt_cond_latent, speaker_embedding = tts_model.get_conditioning_latents(audio_path=[f'./examples/{voice_name}.wav'])
@@ -144,6 +147,7 @@ def get_voice_features(tts_model,audio_path,voice_name,voice_features,voice_feat
     voice_features[voice_name] = {"gpt_cond_latent":gpt_cond_latent,"speaker_embedding":speaker_embedding}
     voice_features_ready[voice_name] = 1
     logger.info(f"{voice_name} ready!")
+    torch.cuda.empty_cache()
     
 class TTSRequest(BaseModel):
     text: str
@@ -170,6 +174,7 @@ async def synthesize_speech(request: TTSRequest):
         voice_name = re.sub(r'^.{2}', 'zh', voice_name, count=1)
     else:
         voice_name = voice_name
+    logger.info(voice_features_ready)
     while voice_features_ready[voice_name] == 0:
         time.sleep(1)
     gpt_cond_latent = voice_features[voice_name]['gpt_cond_latent']
@@ -177,26 +182,34 @@ async def synthesize_speech(request: TTSRequest):
     logger.info(f"  音色特征提取完成")
     if lang_map[language] == "zh-cn":
         text = tokenizer_model_zh(transcription)
+        logger.info(f"  单字词分割完成")
+        logger.info(text)
+        text = text[:args.trunced]
+        generator = text_chunk_generator(text, chunk_size=args.length)
+        logger.info(f"  段落分割完成")
     elif lang_map[language] == "en":
         text = tokenizer_model_en(transcription)
+        logger.info(f"  单字词分割完成")
+        text = text[:int(args.trunced*args.zh_en)]
+        generator = text_chunk_generator(text, chunk_size=int(args.length*args.zh_en))
+        logger.info(f"  段落分割完成")
     else:
         logger.info(f"  不支持此语言")
         return JSONResponse(status_code=200, content={"audio": str(base64.b64encode(bytes(128)).decode('utf-8'))})
-    logger.info(f"  单字词分割完成")
-    generator = text_chunk_generator(text, chunk_size=args.length)
-    logger.info(f"  段落分割完成")
+    logger.info(text)
     chunks = []
     for par_text in generator:
         logger.info(f"      本段数据字符数量为：{len(par_text)}")
         chunk = tts_model.inference(par_text, lang_map[language], gpt_cond_latent, speaker_embedding, temperature=args.temperature)
-        chunks.append(torch.tensor(chunk['wav']))
+        chunks.append(torch.tensor(chunk['wav']).cpu())
         torch.cuda.empty_cache()
     logger.info(f"  数据合成完成")
     result = torch.cat(chunks)
     logger.info(f"  数据拼接完成")
     resampled_audio = result.cpu().numpy()
     logger.info(f"  重采样完成")
-    return JSONResponse(status_code=200, content={"audio": str(base64.b64encode(resampled_audio.tobytes()).decode('utf-8'))})
+    scaled_data = np.int16(np.array(resampled_audio) * 32767)
+    return JSONResponse(status_code=200, content={"audio": str(base64.b64encode(scaled_data.tobytes()).decode('utf-8'))})
 
 class StreamTTSConfig(BaseModel):
     language: str = 'en'
@@ -212,14 +225,14 @@ stream_tts_config = StreamTTSConfig()
 async def websocket_endpoint(websocket: WebSocket):
     global tts_model, tokenizer_model_zh, tts_config, tokenizer_model_en, flag, device, tts_path, tokenizer_path_zh, tokenizer_path_en, stream_tts_config, voice_names, voice_features, voice_features_ready
     logger.info(f"流式合成请求接入")
-    await asyncio.wait_for(websocket.accept(), timeout=100)
+    await asyncio.wait_for(websocket.accept(), timeout=1000)
     #await websocket.accept()
     logger.info(f"流式合成连接建立")
     try:
         receive_stage = 0
         while True:
             logger.info(f"流式合成的第{receive_stage}阶段")
-            message = await asyncio.wait_for(websocket.receive_text(), timeout=100)
+            message = await asyncio.wait_for(websocket.receive_text(), timeout=1000)
             #message = await websocket.receive_text()
             data = json.loads(message)
             logger.info(f"  参数接收完成，待分析")
@@ -238,7 +251,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     format=audio_format, \
                     bits=bits)
                 logger.info(f"  第{receive_stage}阶段，数据解析完成")
-                await asyncio.wait_for(websocket.send_text(json.dumps({"success": True})), timeout=100)
+                await asyncio.wait_for(websocket.send_text(json.dumps({"success": True})), timeout=1000)
                 #await websocket.send_text(json.dumps({"success": True}))
                 logger.info(f"  第{receive_stage}阶段，信息回传完成")
             elif "text" in data:
@@ -254,7 +267,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     "audio_block_seq": i
                 }
                 logger.info(f"  首次响应合成完成")
-                await asyncio.wait_for(websocket.send_text(json.dumps(start_re,ensure_ascii=False)), timeout=100)
+                await asyncio.wait_for(websocket.send_text(json.dumps(start_re,ensure_ascii=False)), timeout=1000)
                 #await websocket.send_text(json.dumps(start_re))
                 logger.info(f"  首字响应发送完成,sent {i} part")
                 i += 1
@@ -271,6 +284,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     voice_name = re.sub(r'^.{2}', 'zh', voice_name, count=1)
                 else:
                     voice_name = voice_name
+                logger.info(voice_features_ready)
                 while voice_features_ready[voice_name] == 0:
                     time.sleep(1)
                 gpt_cond_latent = voice_features[voice_name]['gpt_cond_latent']
@@ -278,26 +292,34 @@ async def websocket_endpoint(websocket: WebSocket):
                 logger.info(f"  音色特征提取完成")
                 if lang_map[language] == "zh-cn":
                     text = tokenizer_model_zh(text)
+                    logger.info(f"  单字词分割完成")
+                    generator = text_chunk_generator(text, chunk_size=args.length)
+                    logger.info(f"  段落分割完成")
                 elif lang_map[language] == "en":
                     text = tokenizer_model_en(text)
+                    logger.info(f"  单字词分割完成")
+                    generator = text_chunk_generator(text, chunk_size=int(args.length*args.zh_en))
+                    logger.info(f"  段落分割完成")
                 else:
                     logger.info(f"  不支持此语言")
                     break
-                logger.info(f"  单字词分割完成")
-                generator = text_chunk_generator(text, chunk_size=args.length)
-                logger.info(f"  段落分割完成")
                 for par_text in generator:
                     logger.info(f"  本段字符数量：{len(par_text)}")
                     chunks = tts_model.inference_stream(par_text, lang_map[language], gpt_cond_latent, speaker_embedding, temperature=args.temperature)
                     for _, chunk in enumerate(chunks):
                         resampled_audio = librosa.resample(chunk.cpu().numpy(), orig_sr=24000, target_sr=sample_rate)
+                        logger.info(f"this chunk time")
+                        if bits == 16:
+                            resampled_audio = np.int16(np.array(resampled_audio) * 32767)
+                            #resampled_audio = resampled_audio.astype(np.float16)
+                        logger.info(f"this trunk process time")
                         response = {
                             "data": str(base64.b64encode(resampled_audio.tobytes()).decode('utf-8')),
                             "audio_status": 1,
                             "audio_block_seq": i
                         }
                         #logger.info(f"响应合成完成")
-                        await asyncio.wait_for(websocket.send_text(json.dumps(response)), timeout=100)
+                        await asyncio.wait_for(websocket.send_text(json.dumps(response)), timeout=1000)
                         #await websocket.send_text(json.dumps(response))
                         logger.info(f"      sent {i} part")
                         i += 1
@@ -311,7 +333,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     "audio_block_seq": i
                 }
                 logger.info(f"  结束响应合成完成")
-                await asyncio.wait_for(websocket.send_text(json.dumps(response)), timeout=100)
+                await asyncio.wait_for(websocket.send_text(json.dumps(response)), timeout=1000)
                 #await websocket.send_text(json.dumps(response))
                 logger.info(f"  结束响应发送完成")
                 i += 1
