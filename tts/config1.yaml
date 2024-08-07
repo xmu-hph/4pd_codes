@@ -7,7 +7,7 @@ values:
     - name: zh_en
       value: 1
     - name: trunced
-      value: 4
+      value: 8
   readinessProbe:
     httpGet:
       path: /ready
@@ -19,9 +19,9 @@ values:
   resources:
     limits:
       cpu: 1
-      memory: 24G
+      memory: 16G
       nvidia.com/gpu: 1
     requests:
       cpu: 1
-      memory: 24G
+      memory: 16G
       nvidia.com/gpu: 1

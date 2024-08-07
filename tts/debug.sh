@@ -1,9 +1,10 @@
-docker run --rm -it --gpus '"device=6"' --network host \
+docker run --rm -it --network host \
+--gpus '"device=6"' \
 -e CUDA_DEVICE_MEMORY_LIMIT=8096m \
 -e LD_PRELOAD=/usr/local/vgpu/libvgpu.so \
 -v /home/hupenghui/vgpu/libvgpu.so:/usr/local/vgpu/libvgpu.so \
 -v /home/hupenghui/vgpulock:/tmp/vgpulock \
--e CUDA_DEVICE_SM_LIMIT=10 \
+-e CUDA_DEVICE_SM_LIMIT=100 \
 -e GPU_CORE_UTILIZATION_POLICY=force \
 harbor-contest.4pd.io/hupenghui/tts:tts_stream_clone_1002 /bin/bash
 #--cpus="1" \

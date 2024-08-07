@@ -86,7 +86,8 @@ def load_model():
         speaker_wav="./examples/zh-c-1.wav",
         language="en",
     )
-    torch.cuda.empty_cache()
+    if device == args.device:
+        torch.cuda.empty_cache()
     logger.info(f"tts模型预热完成")
     tokenizer_model_en = spacy.load(tokenizer_path_en)
     tokenizer_model_zh = spacy.load(tokenizer_path_zh)
@@ -97,7 +98,8 @@ def load_model():
         #logger.info(gpt_cond_latent)
         voice_features[voice_name] = {"gpt_cond_latent":gpt_cond_latent,"speaker_embedding":speaker_embedding}
         voice_features_ready[voice_name] = 1
-        torch.cuda.empty_cache()
+        if device == args.device:
+            torch.cuda.empty_cache()
     logger.info(f"音色特征提取结束")
     flag = True
     logger.info("模型加载线程结束")
@@ -147,7 +149,8 @@ def get_voice_features(tts_model,audio_path,voice_name,voice_features,voice_feat
     voice_features[voice_name] = {"gpt_cond_latent":gpt_cond_latent,"speaker_embedding":speaker_embedding}
     voice_features_ready[voice_name] = 1
     logger.info(f"{voice_name} ready!")
-    torch.cuda.empty_cache()
+    if device == args.device:
+        torch.cuda.empty_cache()
     
 class TTSRequest(BaseModel):
     text: str
@@ -183,7 +186,7 @@ async def synthesize_speech(request: TTSRequest):
     if lang_map[language] == "zh-cn":
         text = tokenizer_model_zh(transcription)
         logger.info(f"  单字词分割完成")
-        logger.info(text)
+        #logger.info(text)
         text = text[:args.trunced]
         generator = text_chunk_generator(text, chunk_size=args.length)
         logger.info(f"  段落分割完成")
@@ -196,17 +199,19 @@ async def synthesize_speech(request: TTSRequest):
     else:
         logger.info(f"  不支持此语言")
         return JSONResponse(status_code=200, content={"audio": str(base64.b64encode(bytes(128)).decode('utf-8'))})
-    logger.info(text)
+    #logger.info(text)
     chunks = []
     for par_text in generator:
         logger.info(f"      本段数据字符数量为：{len(par_text)}")
         chunk = tts_model.inference(par_text, lang_map[language], gpt_cond_latent, speaker_embedding, temperature=args.temperature)
         chunks.append(torch.tensor(chunk['wav']).cpu())
-        torch.cuda.empty_cache()
+        if device == args.device:
+            torch.cuda.empty_cache()
     logger.info(f"  数据合成完成")
     result = torch.cat(chunks)
     logger.info(f"  数据拼接完成")
-    resampled_audio = result.cpu().numpy()
+    #resampled_audio = result.cpu().numpy()
+    resampled_audio = librosa.resample(result.cpu().numpy(), orig_sr=24000, target_sr=16000)
     logger.info(f"  重采样完成")
     scaled_data = np.int16(np.array(resampled_audio) * 32767)
     return JSONResponse(status_code=200, content={"audio": str(base64.b64encode(scaled_data.tobytes()).decode('utf-8'))})
@@ -323,7 +328,8 @@ async def websocket_endpoint(websocket: WebSocket):
                         #await websocket.send_text(json.dumps(response))
                         logger.info(f"      sent {i} part")
                         i += 1
-                    torch.cuda.empty_cache()
+                    if device == args.device:
+                        torch.cuda.empty_cache()
                 logger.info(f"  音频内容发送完成")
                 b = bytes(128)
                 base64_audio_data = base64.b64encode(b).decode('utf-8')
