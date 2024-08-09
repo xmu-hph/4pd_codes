@@ -1,0 +1,11 @@
+__pycache__/
+.ipynb_checkpoints
+id_rsa.pub
+id_rsa
+passwd.md
+*.log
+*.png
+model/
+*.gz
+*.wav
+*.zip

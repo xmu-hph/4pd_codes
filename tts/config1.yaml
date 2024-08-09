@@ -18,10 +18,10 @@ values:
     failureThreshold: 10000
   resources:
     limits:
-      cpu: 1
+      cpu: 2
       memory: 8G
       nvidia.com/gpu: 1
     requests:
-      cpu: 1
+      cpu: 2
       memory: 8G
       nvidia.com/gpu: 1
